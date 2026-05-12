@@ -1,4 +1,4 @@
-# 📈 Stock Analyzer — Phase 1
+# Stock Analyzer — Phase 1
 
 A production-grade stock analysis platform built with **FastAPI** (backend) + **Streamlit** (frontend), both deployed on **Railway**.
 
