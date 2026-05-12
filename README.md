@@ -1,3 +1,9 @@
+# Stock Market Predictor and analyser
+Stock market prediction is not a easy task it requires lot of metrics, new consideration and statistics there may more other things than this also that helps to get ideas about stock market but stock prediction is a probablity we cant gaurantee that stock price will really go up or down, when to purchase or predict. Here i created a Stock Market Predictor and analyser that not just predict much more it does analyse market using trends, current news regarding the stock and many more and considering this metrices i created a app which will help for analysis and then we get a probablity for market changes according to this data.
+
+
+
+
 # Stock Analyzer — Phase 1
 
 A production-grade stock analysis platform built with **FastAPI** (backend) + **Streamlit** (frontend), both deployed on **Railway**.
