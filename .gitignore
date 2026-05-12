@@ -1,0 +1,27 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Env files (never push secrets)
+.env
+.env.local
+*.env
+
+# Logs
+*.log
