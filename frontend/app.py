@@ -46,6 +46,38 @@ def ticker_label(t):
     name = TICKER_NAMES.get(t.upper(), "")
     return f"{name} ({t})" if name else t
 
+# Reverse lookup: "apple" → "AAPL", "microsoft" → "MSFT"
+NAME_TO_TICKER = {v.lower(): k for k, v in TICKER_NAMES.items()}
+# Also add common aliases
+NAME_TO_TICKER.update({
+    "apple inc": "AAPL", "google": "GOOGL", "alphabet": "GOOGL",
+    "meta": "META", "facebook": "META", "nvidia": "NVDA",
+    "amazon": "AMZN", "tesla": "TSLA", "microsoft": "MSFT",
+    "reliance": "RELIANCE.NS", "tata consultancy": "TCS.NS",
+    "tcs": "TCS.NS", "infosys": "INFY.NS", "hdfc": "HDFCBANK.NS",
+    "bitcoin": "BTC-USD", "ethereum": "ETH-USD",
+    "sp500": "SPY", "s&p500": "SPY", "nasdaq": "QQQ",
+    "jpmorgan": "JPM", "jp morgan": "JPM", "goldman": "GS",
+    "pfizer": "PFE", "johnson": "JNJ",
+})
+
+def resolve_ticker(raw: str) -> str:
+    """Convert company name to ticker. Returns original if already a ticker."""
+    cleaned = raw.strip().upper()
+    # Already looks like a ticker (short, no spaces, or has .NS / -USD suffix)
+    if (len(cleaned) <= 6 and " " not in cleaned) or "." in cleaned or "-" in cleaned:
+        return cleaned
+    # Try name lookup
+    lower = raw.strip().lower()
+    if lower in NAME_TO_TICKER:
+        return NAME_TO_TICKER[lower]
+    # Partial match — find first ticker whose name starts with the input
+    for name, ticker in NAME_TO_TICKER.items():
+        if name.startswith(lower):
+            return ticker
+    # No match — return as-is (API will handle the error)
+    return cleaned
+
 WATCHLISTS = {
     "🇺🇸 US Tech":      ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "INTC", "CRM"],
     "🇺🇸 US Finance":   ["JPM", "BAC", "GS", "MS", "WFC", "C", "V", "MA", "BLK", "AXP"],
@@ -277,9 +309,13 @@ with st.sidebar:
         "**Ticker Symbol**",
         key="ticker_widget",
         value=st.session_state["ticker"],
-        placeholder="AAPL · TSLA · INFY.NS · BTC-USD",
-        help="US: AAPL | India: RELIANCE.NS | Crypto: BTC-USD",
-    ).upper().strip()
+        placeholder="Apple · Tesla · AAPL · RELIANCE.NS",
+        help="Type company name (Apple, Tesla) OR ticker code (AAPL, TSLA, RELIANCE.NS)",
+    ).strip()
+    # Show resolution hint
+    resolved_from = st.session_state.get("ticker_resolved_from","")
+    if resolved_from and resolved_from.lower() != st.session_state["ticker"].lower():
+        st.caption(f"✓ Showing: **{st.session_state['ticker']}** ({TICKER_NAMES.get(st.session_state['ticker'], '')})")
 
     analyze = st.button("🔍 Analyze", type="primary", width='stretch')
 
@@ -306,7 +342,10 @@ with st.sidebar:
 
 # ── Resolve active ticker ─────────────────────────────────────
 if analyze:
-    st.session_state["ticker"] = ticker_input
+    resolved = resolve_ticker(ticker_input)
+    st.session_state["ticker"] = resolved
+    if resolved != ticker_input.upper():
+        st.session_state["ticker_resolved_from"] = ticker_input
 active = st.session_state.get("ticker", "AAPL")
 
 
@@ -964,9 +1003,9 @@ with tab_ai:
     if run_ai or st.session_state.get("ai_ran"):
         if run_ai:
             st.session_state["ai_ran"] = True
-            st.session_state["ai_ticker_val"] = ai_ticker.upper()
+            st.session_state["ai_ticker_val"] = resolve_ticker(ai_ticker)
 
-        ai_sym = st.session_state.get("ai_ticker_val", ai_ticker.upper())
+        ai_sym = resolve_ticker(st.session_state.get("ai_ticker_val", ai_ticker))
 
         with st.spinner(f"Running AI Analysis on {ai_sym} — Regime · Forecast · Ensemble..."):
             try:
@@ -1386,7 +1425,7 @@ with tab_de:
 
     if run_de:
         st.session_state["de_ran"] = True
-        st.session_state["de_sym"] = de_ticker.upper()
+        st.session_state["de_sym"] = resolve_ticker(de_ticker)
 
     if st.session_state.get("de_ran"):
         de_sym = st.session_state.get("de_sym", de_ticker.upper())
@@ -1560,7 +1599,15 @@ with tab_de:
                             title = art.get("title","")
                             st.markdown(f"**{impact}** &nbsp; "
                                         f"[{title}]({url})" if url else f"**{impact}** {title}")
-                            st.caption(f"{art.get('source','')} · Relevance: {rel}/10 · {art.get('pub','')}")
+                            # Explain why relevant to this sector
+                            sector_shown = de_data.get("sector","Technology")
+                            rel_reason = (
+                                f"Relevant to **{sector_shown}** sector · "
+                                f"Relevance: {rel}/10 · {art.get('source','')} · {art.get('pub','')}"
+                            )
+                            st.caption(rel_reason)
+                            if art.get("desc"):
+                                st.caption(f"_{art['desc'][:150]}..._" if len(art.get('desc',''))>150 else f"_{art.get('desc','')}_")
                         with cb:
                             st.markdown(f"<div style='color:{sent_c};font-weight:700;"
                                         f"text-align:right'>{comp:+.3f}</div>",
