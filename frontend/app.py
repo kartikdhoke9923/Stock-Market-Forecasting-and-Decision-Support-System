@@ -13,6 +13,39 @@ from plotly.subplots import make_subplots
 # ── Config ────────────────────────────────────────────────────
 BACKEND = os.environ.get("BACKEND_URL", "http://localhost:8000").rstrip("/")
 
+# Full company names for display
+TICKER_NAMES = {
+    # US Tech
+    "AAPL":"Apple","MSFT":"Microsoft","NVDA":"Nvidia","GOOGL":"Alphabet (Google)",
+    "AMZN":"Amazon","META":"Meta Platforms","TSLA":"Tesla","AMD":"AMD",
+    "INTC":"Intel","CRM":"Salesforce","ORCL":"Oracle","ADBE":"Adobe",
+    "NFLX":"Netflix","QCOM":"Qualcomm","IBM":"IBM","CSCO":"Cisco",
+    # US Finance
+    "JPM":"JPMorgan Chase","BAC":"Bank of America","GS":"Goldman Sachs",
+    "MS":"Morgan Stanley","WFC":"Wells Fargo","C":"Citigroup",
+    "V":"Visa","MA":"Mastercard","BLK":"BlackRock","AXP":"American Express",
+    # US Healthcare
+    "JNJ":"Johnson & Johnson","PFE":"Pfizer","UNH":"UnitedHealth",
+    "ABBV":"AbbVie","MRK":"Merck","TMO":"Thermo Fisher","ABT":"Abbott",
+    "BMY":"Bristol-Myers","AMGN":"Amgen","GILD":"Gilead Sciences",
+    # ETFs
+    "SPY":"S&P 500 ETF","QQQ":"Nasdaq 100 ETF","VTI":"Total Market ETF",
+    "IWM":"Russell 2000 ETF","GLD":"Gold ETF","SLV":"Silver ETF",
+    "TLT":"Treasury Bond ETF","XLF":"Financial ETF","XLK":"Technology ETF",
+    # India NSE
+    "RELIANCE.NS":"Reliance Industries","TCS.NS":"Tata Consultancy",
+    "INFY.NS":"Infosys","HDFCBANK.NS":"HDFC Bank","ICICIBANK.NS":"ICICI Bank",
+    "WIPRO.NS":"Wipro","TATAMOTORS.NS":"Tata Motors","BAJFINANCE.NS":"Bajaj Finance",
+    "MARUTI.NS":"Maruti Suzuki","SUNPHARMA.NS":"Sun Pharma",
+    # Crypto
+    "BTC-USD":"Bitcoin","ETH-USD":"Ethereum","IBIT":"iShares Bitcoin ETF",
+    "FBTC":"Fidelity Bitcoin ETF",
+}
+
+def ticker_label(t):
+    name = TICKER_NAMES.get(t.upper(), "")
+    return f"{name} ({t})" if name else t
+
 WATCHLISTS = {
     "🇺🇸 US Tech":      ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "INTC", "CRM"],
     "🇺🇸 US Finance":   ["JPM", "BAC", "GS", "MS", "WFC", "C", "V", "MA", "BLK", "AXP"],
@@ -255,7 +288,8 @@ with st.sidebar:
     quick = ["AAPL","MSFT","NVDA","TSLA","AMZN","GOOGL","META","SPY","RELIANCE.NS","TCS.NS"]
     cols = st.columns(2)
     for i, t in enumerate(quick):
-        if cols[i % 2].button(t, key=f"q_{t}", width='stretch'):
+        name = TICKER_NAMES.get(t, t)
+        if cols[i % 2].button(name, key=f"q_{t}", width='stretch', help=f"Ticker: {t}"):
             st.session_state["ticker"] = t
             st.rerun()
 
@@ -280,7 +314,7 @@ active = st.session_state.get("ticker", "AAPL")
 st.markdown('<div class="main-title">📈 Stock Market Analyzer</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Technical Indicators · News Sentiment · Earnings & Fundamentals · Screener</div>', unsafe_allow_html=True)
 
-tab_ov, tab_ta, tab_sent, tab_earn, tab_screen, tab_bt, tab_port, tab_ai = st.tabs([
+tab_ov, tab_ta, tab_sent, tab_earn, tab_screen, tab_bt, tab_port, tab_ai, tab_de = st.tabs([
     "📊 Overview",
     "📉 Technical Analysis",
     "📰 News Sentiment",
@@ -289,6 +323,7 @@ tab_ov, tab_ta, tab_sent, tab_earn, tab_screen, tab_bt, tab_port, tab_ai = st.ta
     "⚡ Backtester",
     "💼 Portfolio",
     "🚀 AI Analysis",
+    "🎯 Decision Engine",
 ])
 
 
@@ -545,7 +580,11 @@ with tab_screen:
                 rows = result["results"]
                 st.success(f"✅ **{len(rows)} stocks** matched your criteria")
 
-                df_sc = pd.DataFrame(rows)
+                for r in rows:
+                    r["company"] = TICKER_NAMES.get(r["ticker"], r["ticker"])
+                df_sc   = pd.DataFrame(rows)
+                ordered = ["company"] + [c for c in df_sc.columns if c != "company"]
+                df_sc   = df_sc[ordered]
 
                 # Style
                 def _sig_style(val):
@@ -1330,3 +1369,215 @@ with tab_ai:
     and ensemble scores are <b>research tools only</b> — not financial advice or trading signals.
     All models have limitations and can be wrong. Always apply independent judgment.
     </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════ DECISION ENGINE ════════════════════
+with tab_de:
+    st.markdown('<div class="main-title" style="font-size:1.6rem">🎯 Decision Engine</div>',
+                unsafe_allow_html=True)
+    st.caption("Every signal combined automatically → one clear BUY / HOLD / SELL verdict")
+
+    de_col1, de_col2 = st.columns([3,1])
+    de_ticker = de_col1.text_input("Enter ticker", value=active, key="de_ticker",
+                                    placeholder="AAPL, RELIANCE.NS, BTC-USD")
+    de_period = de_col2.selectbox("Period", ["6mo","1y","2y"], index=1, key="de_period")
+    run_de    = st.button("🎯 Analyze & Decide", type="primary",
+                          use_container_width=True, key="run_de")
+
+    if run_de:
+        st.session_state["de_ran"] = True
+        st.session_state["de_sym"] = de_ticker.upper()
+
+    if st.session_state.get("de_ran"):
+        de_sym = st.session_state.get("de_sym", de_ticker.upper())
+        de_per = st.session_state.get("de_period", "1y")
+
+        with st.spinner(f"Running full analysis on {de_sym} — Technical · Macro News · Earnings · Forecast..."):
+            try:
+                resp    = requests.get(f"{BACKEND}/decide/{de_sym}",
+                                       params={"period": de_per}, timeout=120)
+                de_data = resp.json() if resp.ok else None
+            except Exception:
+                de_data = None
+
+        if not de_data or "decision" not in de_data:
+            st.error("Analysis failed. Check ticker or try again.")
+            st.session_state["de_ran"] = False
+        else:
+            dec    = de_data["decision"]
+            macro  = de_data.get("macro",  {})
+            fct    = de_data.get("forecast",{})
+            sector = de_data.get("sector", "N/A")
+            regime = de_data.get("regime", "Unknown")
+
+            verdict    = dec.get("verdict",    "HOLD")
+            color      = dec.get("color",      "#8b949e")
+            arrow      = dec.get("arrow",      "→")
+            conf       = dec.get("confidence", "LOW")
+            conf_color = dec.get("conf_color", "#8b949e")
+            score      = dec.get("final_score",50)
+            plain      = dec.get("plain_english","")
+            risks      = dec.get("risks",      [])
+            levels     = dec.get("levels",     {})
+            comp_sc    = dec.get("component_scores", {})
+            last_p     = dec.get("last_price", 0)
+            macro_sig  = dec.get("macro_signal","NEUTRAL")
+            macro_risk = dec.get("macro_risk","UNKNOWN")
+
+            # ── MAIN VERDICT CARD ─────────────────────────────
+            st.markdown(f"""
+            <div style='background:#161b22;border:3px solid {color};border-radius:16px;
+            padding:28px 32px;text-align:center;margin:16px 0'>
+                <div style='font-size:0.85rem;color:#8b949e;text-transform:uppercase;
+                letter-spacing:2px;margin-bottom:8px'>Decision for {de_sym} · {sector}</div>
+                <div style='font-size:4.5rem;font-weight:900;color:{color};
+                line-height:1'>{arrow} {verdict}</div>
+                <div style='display:flex;justify-content:center;gap:32px;margin-top:16px;flex-wrap:wrap'>
+                    <div><span style='color:#8b949e;font-size:0.8rem'>SCORE</span>
+                    <div style='font-size:1.8rem;font-weight:700;color:{color}'>{score}/100</div></div>
+                    <div><span style='color:#8b949e;font-size:0.8rem'>CONFIDENCE</span>
+                    <div style='font-size:1.2rem;font-weight:700;color:{conf_color}'>{conf}</div></div>
+                    <div><span style='color:#8b949e;font-size:0.8rem'>REGIME</span>
+                    <div style='font-size:1.2rem;font-weight:700;color:#e6edf3'>{regime}</div></div>
+                    <div><span style='color:#8b949e;font-size:0.8rem'>MACRO</span>
+                    <div style='font-size:1.2rem;font-weight:700;
+                    color:{"#f85149" if "BEAR" in macro_sig else "#3fb950" if "BULL" in macro_sig else "#8b949e"}'>{macro_sig}</div></div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+            # ── PLAIN ENGLISH ─────────────────────────────────
+            if plain:
+                st.info(f"📖 **What this means:** {plain}")
+
+            st.divider()
+
+            # ── ENTRY / STOP / TARGET ─────────────────────────
+            if levels and last_p:
+                st.subheader("📍 Trade Levels")
+                st.caption("Entry zone = forecast p25–p50 (buy on dip) · Stop = 1.5× ATR below entry · Target = forecast p75")
+
+                l1,l2,l3,l4,l5 = st.columns(5)
+                l1.metric("Last Price",    f"${last_p:,.2f}" if last_p else "N/A")
+                el = levels.get("entry_low")
+                eh = levels.get("entry_high")
+                sl = levels.get("stop_loss")
+                tp = levels.get("take_profit")
+                rr = levels.get("rr_ratio")
+                sp = levels.get("stop_pct")
+                tp_p = levels.get("target_pct")
+                l2.metric("Entry Zone",   f"${el:,.2f}–${eh:,.2f}" if el and eh else "N/A")
+                l3.metric("Stop Loss",    f"${sl:,.2f}" if sl else "N/A",
+                           delta=f"{sp:.1f}%" if sp else None, delta_color="inverse")
+                l4.metric("Take Profit",  f"${tp:,.2f}" if tp else "N/A",
+                           delta=f"+{tp_p:.1f}%" if tp_p else None)
+                l5.metric("Risk/Reward",  f"1 : {rr:.1f}" if rr else "N/A")
+
+                # Visual risk bar
+                if sl and tp and last_p and el:
+                    entry_mid = (el + (eh or el)) / 2
+                    total_range = (tp - sl)
+                    if total_range > 0:
+                        loss_pct   = (entry_mid - sl) / total_range * 100
+                        profit_pct = (tp - entry_mid) / total_range * 100
+                        st.markdown(f"""
+                        <div style='margin:12px 0'>
+                        <div style='display:flex;height:16px;border-radius:8px;overflow:hidden'>
+                            <div style='width:{loss_pct:.0f}%;background:#f85149;opacity:0.8'></div>
+                            <div style='width:4px;background:#ffffff'></div>
+                            <div style='width:{profit_pct:.0f}%;background:#3fb950;opacity:0.8'></div>
+                        </div>
+                        <div style='display:flex;justify-content:space-between;
+                        font-size:0.75rem;color:#8b949e;margin-top:4px'>
+                            <span>Stop ${sl:,.2f}</span>
+                            <span>Entry ~${entry_mid:,.2f}</span>
+                            <span>Target ${tp:,.2f}</span>
+                        </div></div>""", unsafe_allow_html=True)
+
+            st.divider()
+
+            # ── SCORE BREAKDOWN ───────────────────────────────
+            st.subheader("📊 Score Breakdown")
+            st.caption("How each signal contributed to the final verdict")
+
+            weights = dec.get("weights", {})
+            score_rows = [
+                ("🔧 Technical Indicators", "technical",       "All 7 indicators (RSI, MACD, BB, MA Cross, Stochastic, Volume, ATR)"),
+                ("📰 Stock News",           "stock_sentiment", "Yahoo Finance news sentiment about this stock"),
+                ("🌍 Global Macro News",    "macro_sentiment", "Reuters, BBC, AP, CNBC — global events relevant to this sector"),
+                ("💰 Earnings Quality",     "earnings",        "Recent EPS beat/miss vs Wall Street estimates"),
+                ("🔮 Forecast Direction",   "forecast",        "Monte Carlo probability of gain over 10 days"),
+            ]
+
+            for label, key, desc in score_rows:
+                sc  = comp_sc.get(key, 50)
+                w   = weights.get(key, 0)
+                bar = sc / 100
+                col = "#3fb950" if sc >= 55 else "#f85149" if sc < 45 else "#8b949e"
+                st.markdown(f"""
+                <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;
+                padding:12px 16px;margin:6px 0'>
+                    <div style='display:flex;justify-content:space-between;align-items:center'>
+                        <div>
+                            <span style='color:#e6edf3;font-weight:600'>{label}</span>
+                            <span style='color:#6e7681;font-size:0.75rem;margin-left:8px'>
+                            weight {int(w*100)}%</span>
+                        </div>
+                        <span style='color:{col};font-weight:700;font-size:1.1rem'>{sc:.0f}/100</span>
+                    </div>
+                    <div style='background:#21262d;border-radius:4px;height:6px;margin:8px 0'>
+                        <div style='background:{col};width:{sc}%;height:6px;border-radius:4px'></div>
+                    </div>
+                    <div style='color:#6e7681;font-size:0.75rem'>{desc}</div>
+                </div>""", unsafe_allow_html=True)
+
+            st.divider()
+
+            # ── GLOBAL MACRO NEWS ─────────────────────────────
+            st.subheader("🌍 Global Macro Events")
+            risk_color = {"HIGH":"#f85149","ELEVATED":"#d29922",
+                          "MODERATE":"#58a6ff","LOW":"#3fb950"}.get(macro_risk,"#8b949e")
+            st.markdown(
+                f"Global Risk Level: <span style='color:{risk_color};font-weight:700'>"
+                f"{macro_risk}</span> · {macro.get('summary','')}",
+                unsafe_allow_html=True)
+
+            # Only show MEDIUM/HIGH impact articles with relevance >= 3.5
+            arts = [a for a in macro.get("articles",[])
+                    if a.get("relevance",0) >= 3.5 and "LOW" not in a.get("impact","LOW")]
+            if not arts:
+                arts = sorted(macro.get("articles",[]),
+                              key=lambda x: x.get("relevance",0), reverse=True)[:3]
+            if arts:
+                for art in arts[:8]:
+                    impact = art.get("impact","🟢 LOW")
+                    comp   = art.get("compound",0)
+                    rel    = art.get("relevance",0)
+                    sent_c = "#3fb950" if comp>=0.05 else "#f85149" if comp<=-0.05 else "#8b949e"
+                    with st.container():
+                        ca, cb = st.columns([7,1])
+                        with ca:
+                            url   = art.get("url","")
+                            title = art.get("title","")
+                            st.markdown(f"**{impact}** &nbsp; "
+                                        f"[{title}]({url})" if url else f"**{impact}** {title}")
+                            st.caption(f"{art.get('source','')} · Relevance: {rel}/10 · {art.get('pub','')}")
+                        with cb:
+                            st.markdown(f"<div style='color:{sent_c};font-weight:700;"
+                                        f"text-align:right'>{comp:+.3f}</div>",
+                                        unsafe_allow_html=True)
+                        st.divider()
+            else:
+                st.info("No relevant global news found for this sector.")
+
+            # ── RISK FACTORS ──────────────────────────────────
+            if risks:
+                st.subheader("⚠️ Risk Factors")
+                for r in risks:
+                    st.markdown(f"🔴 {r}")
+
+        st.markdown("""
+        <div class="disclaimer">
+        ⚠️ Decision Engine combines multiple signals but <b>cannot guarantee tomorrow's direction</b>.
+        Use entry/stop/target levels as guidelines — always apply your own judgment.
+        This is a research tool, not financial advice.
+        </div>""", unsafe_allow_html=True)
