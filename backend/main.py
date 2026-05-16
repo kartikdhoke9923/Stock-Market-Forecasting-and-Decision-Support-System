@@ -342,3 +342,80 @@ def get_analysis(ticker_sym: str, period: str = "1y",
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis error [{sym}]: {e}")
+
+
+# ── Decision Engine + Macro Sentiment ────────────────────────
+from macro_sentiment  import get_macro_sentiment
+from decision_engine  import compute_decision
+
+@app.get("/macro/{ticker_sym}")
+def get_macro(ticker_sym: str, sector: str = "default"):
+    """Global macro news sentiment for this stock's sector."""
+    try:
+        return get_macro_sentiment(ticker_sym.upper(), sector)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/decide/{ticker_sym}")
+def decide(ticker_sym: str, period: str = "1y"):
+    """
+    Master Decision Engine endpoint.
+    Runs ALL analysis and returns single BUY/HOLD/SELL verdict
+    with entry zone, stop loss, take profit and plain English explanation.
+    """
+    sym = ticker_sym.upper()
+    try:
+        df = fetch_history(sym, period=period)
+        if len(df) < 60:
+            raise HTTPException(status_code=400,
+                detail="Need ≥60 bars for decision engine.")
+
+        # Get sector from Yahoo info (for macro keyword mapping)
+        info   = get_info_v8(sym)
+        sector = info.get("sector","default") or "default"
+
+        # Run all analyses in parallel conceptually (sequential for simplicity)
+        from ensemble    import compute_ensemble
+        from regime      import detect_regime
+        from forecaster  import probabilistic_forecast
+        from sentiment   import analyze_news_sentiment
+        from earnings    import get_earnings_data
+
+        try: reg_data  = detect_regime(df)
+        except: reg_data = {"current_regime": "default"}
+
+        regime = reg_data.get("current_regime","default")
+
+        try: ens_data  = compute_ensemble(df, regime=regime)
+        except: ens_data = {"score":50,"components":{}}
+
+        try: fct_data  = probabilistic_forecast(df, days=10, n_sim=500)
+        except: fct_data = {"prob_gain":50,"bands":{},"last_price":0}
+
+        try: stk_sent  = analyze_news_sentiment(sym)
+        except: stk_sent = {"overall_score":0}
+
+        try: mac_sent  = get_macro_sentiment(sym, sector)
+        except: mac_sent = {"overall_score":0,"macro_signal":"NEUTRAL","risk_level":"UNKNOWN"}
+
+        try: earn_data = get_earnings_data(sym)
+        except: earn_data = {}
+
+        decision = compute_decision(
+            sym, ens_data, stk_sent, mac_sent, earn_data, fct_data, df
+        )
+
+        return {
+            "ticker":   sym,
+            "sector":   sector,
+            "regime":   regime,
+            "decision": decision,
+            "forecast": fct_data,
+            "macro":    mac_sent,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Decision error [{sym}]: {e}")
