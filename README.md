@@ -1,144 +1,104 @@
 # Stock Market Predictor and analyser
-Stock market prediction is not a easy task it requires lot of metrics, new consideration and statistics there may more other things than this also that helps to get ideas about stock market but stock prediction is a probablity we cant gaurantee that stock price will really go up or down, when to purchase or predict. Here i created a Stock Market Predictor and analyser that not just predict much more it does analyse market using trends, current news regarding the stock and many more and considering this metrices i created a app which will help for analysis and then we get a probablity for market changes according to this data.
+Stock market prediction is not an easy task it requires a lot of metrics, news consideration and statistics there may be more other things than this also that helps to get ideas about stock market but stock prediction is a probability; we cant guarantee that stock price will really go up or down, when to purchase or predict. Here i created a Stock Market Predictor and analyzer that doesn't just predict much more. it analyzes the market using trends, current news regarding the stock and many more and considering this metrics i created an app which will help for analysis and then we get a probablity for market changes according to this data.
 
+> A production-grade stock analysis and decision support platform built across 3 phases.
+> Combines technical indicators, global macro sentiment, probabilistic forecasting, backtesting, and portfolio optimization into one unified tool.
 
-
-
-# Stock Analyzer — Phase 1
-
-A production-grade stock analysis platform built with **FastAPI** (backend) + **Streamlit** (frontend), both deployed on **Railway**.
+**[Live Demo →](https://smapredictor.streamlit.app)** &nbsp;|&nbsp; **[API Docs →](http://54.237.238.233:8000/docs)** &nbsp;|&nbsp; **[Development Journey →](./JOURNEY.md)**
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────┐      HTTP/REST     ┌──────────────────────────┐
-│   Streamlit Frontend     │ ◄────────────────► │    FastAPI Backend       │
-│   Railway Service #2     │                    │    Railway Service #1    │
-│                          │                    │                          │
-│  Tab 1: Overview         │                    │  GET  /info/{ticker}     │
-│  Tab 2: Technical        │                    │  GET  /indicators/{tick} │
-│  Tab 3: Sentiment        │                    │  GET  /sentiment/{tick}  │
-│  Tab 4: Earnings         │                    │  GET  /earnings/{tick}   │
-│  Tab 5: Screener         │                    │  POST /screen            │
-└──────────────────────────┘                    └──────────────────────────┘
-                                                          │
-                                                          ▼
-                                               yfinance (free, no key)
-                                               VADER sentiment (free)
+Streamlit Frontend (Streamlit Cloud - Free)
+        ↕ HTTP/REST
+FastAPI Backend (AWS EC2 t3.micro - Free Tier)
+        ↕
+Free Data Sources:
+  yfinance    → price, earnings, news
+  Reuters RSS → global macro news  
+  BBC RSS     → world news
+  AP News RSS → breaking news
+  CNBC RSS    → market news
 ```
 
-> **Why not Vercel?** Streamlit is a Python server process — Vercel only runs static files and JS/Python serverless functions. Railway runs full Docker/Nixpacks containers, making it perfect for both services.
-
 ---
 
-## Features (Phase 1)
+## Features
 
-### 📉 Technical Indicator Engine
-| Indicator | What it detects |
+### Phase 1 — Analysis Engine
+| Feature | Description |
 |---|---|
-| RSI (14) | Overbought (>70) / Oversold (<30) |
-| MACD (12,26,9) | Bullish / Bearish crossovers |
-| Bollinger Bands (20,2) | Squeeze, breakout direction |
-| Golden / Death Cross | SMA 50 vs SMA 200 trend confirmation |
-| Stochastic (14,3) | Short-term momentum extremes |
-| ATR, OBV | Volatility, volume confirmation |
+| **Overview** | Price, market cap, P/E, beta, 52-week range, EPS, dividend yield |
+| **Technical Analysis** | RSI, MACD, Bollinger Bands, MA Cross, Stochastic, ATR, OBV |
+| **News Sentiment** | Yahoo Finance RSS headlines scored with VADER |
+| **Earnings** | Quarterly EPS actual vs estimate, revenue, analyst consensus |
+| **Stock Screener** | Batch scan watchlists by RSI range and signal type |
 
-Each indicator generates a **signal** (BUY / WEAK BUY / NEUTRAL / WEAK SELL / SELL) with a reason and strength level. An **Overall Signal** score aggregates all signals.
+### Phase 2 — Backtesting & Portfolio
+| Feature | Description |
+|---|---|
+| **Backtester** | 6 strategies, Sharpe/Sortino/MaxDD/Calmar, walk-forward validation |
+| **Portfolio Optimizer** | Efficient frontier, Max Sharpe, Min Volatility, Risk Parity |
 
-### 📰 News Sentiment Analyzer
-- Fetches latest news via `yfinance` (no API key needed)
-- Scores each headline using **VADER** (rule-based, tuned for financial text)
-- Per-article sentiment + overall gauge visualization
-- Positive / Negative / Neutral counts
-
-### 💰 Earnings & Fundamentals
-- Quarterly EPS (Actual vs Estimate) bar chart
-- Revenue history
-- Next earnings date
-- Analyst consensus (Strong Buy → Strong Sell distribution)
-- Recent analyst upgrade/downgrade actions
-
-### 🔍 Stock Screener
-- Preset watchlists: US Tech, US Finance, US Healthcare, India NSE, ETFs
-- Custom ticker input
-- Filter by RSI range and/or signal type
-- Color-coded results table
-- One-click drill-down into full analysis
+### Phase 3 — AI & Decision Engine
+| Feature | Description |
+|---|---|
+| **Regime Detection** | GaussianMixture → Bull / Bear / High Volatility / Consolidation |
+| **Probabilistic Forecast** | EWMA-GARCH + ARIMA + Bootstrap Monte Carlo fan chart |
+| **Ensemble Score** | 7 indicators with regime-adaptive weights → 0–100 score |
+| **Global Macro Sentiment** | Reuters/BBC/AP/CNBC → relevance-scored to each sector |
+| **Decision Engine** | All signals → BUY/HOLD/SELL + entry zone, stop loss, take profit |
 
 ---
 
-## Local Development
+## Tech Stack
+
+```
+Backend:   FastAPI, yfinance, pandas, numpy, scikit-learn, statsmodels, scipy, vaderSentiment
+Frontend:  Streamlit, Plotly, requests
+Infra:     AWS EC2 t3.micro, Streamlit Community Cloud, GitHub
+```
+
+---
+
+## Quick Start (Local)
 
 ```bash
-# 1. Clone / download the project
-cd stock-analyzer
-
-# 2. Start the backend
+# Backend
 cd backend
+python -m venv venv && venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
-# 3. Start the frontend (new terminal)
+# Frontend (new terminal)
 cd frontend
+python -m venv venv && venv\Scripts\activate
 pip install -r requirements.txt
-BACKEND_URL=http://localhost:8000 streamlit run app.py
-# Open http://localhost:8501
+streamlit run app.py
+# Set BACKEND_URL=http://localhost:8000 in environment
 ```
 
 ---
 
-## Deployment on Railway
+## API Endpoints
 
-### Step 1 — Deploy the Backend
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Health check |
+| `GET /info/{ticker}` | Stock overview |
+| `GET /indicators/{ticker}` | Technical analysis |
+| `GET /sentiment/{ticker}` | News sentiment |
+| `GET /earnings/{ticker}` | Earnings data |
+| `POST /screen` | Batch screener |
+| `POST /backtest` | Strategy backtesting |
+| `POST /portfolio/optimize` | Portfolio optimization |
+| `GET /analysis/{ticker}` | AI analysis (Phase 3) |
+| `GET /decide/{ticker}` | Decision engine |
+| `GET /macro/{ticker}` | Global macro sentiment |
 
-1. Go to [railway.app](https://railway.app) → **New Project**
-2. Click **Deploy from GitHub repo** → select your repo
-3. Set the **Root Directory** to `backend`
-4. Railway auto-detects `railway.toml` and starts with:
-   ```
-   uvicorn main:app --host 0.0.0.0 --port $PORT
-   ```
-5. Once deployed, go to **Settings → Networking → Generate Domain**
-6. Copy your backend URL: `https://stock-api-xxxx.up.railway.app`
-7. Test it: visit `https://stock-api-xxxx.up.railway.app/health` → should return `{"status":"ok"}`
-
-### Step 2 — Deploy the Frontend
-
-1. In the same Railway project → **New Service → GitHub repo**
-2. Set **Root Directory** to `frontend`
-3. Add environment variable:
-   ```
-   BACKEND_URL = https://stock-api-xxxx.up.railway.app
-   ```
-   *(use the URL from Step 1)*
-4. Railway starts with:
-   ```
-   streamlit run app.py --server.port $PORT --server.address 0.0.0.0
-   ```
-5. Generate a domain for the frontend service too
-6. Open your Streamlit URL — done! 🎉
-
-### Railway Free Tier Notes
-- Each service gets **500 free hours/month** (enough for 24/7 for ~20 days)
-- No credit card needed for Hobby plan
-- Both services can run in the same project (shared billing)
-- Cold starts take ~10s on free tier — consider upgrading to Developer ($5/mo) for always-on
-
----
-
-## Supported Ticker Formats
-
-| Market | Format | Example |
-|---|---|---|
-| US Stocks | Plain symbol | `AAPL`, `TSLA`, `NVDA` |
-| India NSE | Append `.NS` | `RELIANCE.NS`, `TCS.NS` |
-| India BSE | Append `.BO` | `RELIANCE.BO` |
-| UK | Append `.L` | `HSBA.L` |
-| Germany | Append `.DE` | `VOW3.DE` |
-| Crypto | Append `-USD` | `BTC-USD`, `ETH-USD` |
-| ETFs | Plain symbol | `SPY`, `QQQ`, `GLD` |
+Interactive docs: `http://54.237.238.233:8000/docs`
 
 ---
 
@@ -147,49 +107,33 @@ BACKEND_URL=http://localhost:8000 streamlit run app.py
 ```
 stock-analyzer/
 ├── backend/
-│   ├── main.py          # FastAPI app + all routes
-│   ├── indicators.py    # RSI, MACD, BB, Stochastic, ATR, OBV + signal logic
-│   ├── sentiment.py     # yfinance news + VADER sentiment scoring
-│   ├── earnings.py      # Quarterly EPS, revenue, analyst recs
-│   ├── screener.py      # Fast batch ticker analysis
-│   ├── requirements.txt
-│   └── railway.toml     # Railway deployment config
+│   ├── main.py              # FastAPI + all endpoints
+│   ├── utils.py             # Data fetcher (3-strategy fallback)
+│   ├── indicators.py        # Technical indicators
+│   ├── sentiment.py         # Stock news sentiment
+│   ├── macro_sentiment.py   # Global macro news
+│   ├── earnings.py          # Earnings + analyst recs
+│   ├── screener.py          # Batch screener
+│   ├── strategies.py        # 6 trading strategies
+│   ├── backtester.py        # Backtesting + walk-forward
+│   ├── portfolio.py         # Portfolio optimizer
+│   ├── regime.py            # Regime detection (GMM)
+│   ├── forecaster.py        # Probabilistic forecast
+│   ├── ensemble.py          # Ensemble scoring
+│   ├── decision_engine.py   # Final decision
+│   ├── logger_config.py     # Logging
+│   └── requirements.txt
 ├── frontend/
-│   ├── app.py           # Full Streamlit UI (5 tabs, Plotly charts)
-│   ├── requirements.txt
-│   └── railway.toml     # Railway deployment config
+│   ├── app.py               # Streamlit UI (9 tabs)
+│   └── requirements.txt
+├── render.yaml
+├── JOURNEY.md               # ← Development journey
 └── README.md
 ```
 
 ---
 
-## Phase Roadmap
-
-| Phase | Status | Features |
-|---|---|---|
-| **Phase 1** | ✅ Built | Screener, Technical Indicators, Sentiment, Earnings |
-| **Phase 2** | 🔜 Next | Backtesting engine, walk-forward validation, portfolio optimization |
-| **Phase 3** | 🔜 Future | Probabilistic forecasting, regime detection, ensemble methods |
-
----
-
-## What's Better Than the Old App
-
-| Old Approach | New Approach |
-|---|---|
-| LSTM point predictions (unreliable) | Signal-based analysis (transparent) |
-| Single hardcoded ticker (VOW3.DE) | Any ticker, user-selectable |
-| Fake confidence labels (HIGH/LOW) | Real indicator math with reasons |
-| 6-hour refresh ignoring market hours | On-demand fetch, 5-min cache |
-| Recursive error compounding | No compounding — each indicator independent |
-| No sentiment or fundamentals | News sentiment + earnings + analyst recs |
-| Render deployment (single service) | Railway (2 services, clean separation) |
-
----
-
 ## Disclaimer
 
-> This tool is for **educational and research purposes only**.  
-> It is **not financial advice**.  
-> Past signals do not guarantee future performance.  
-> Always consult a qualified financial advisor before making investment decisions.
+This tool is for **educational and research purposes only** — not financial advice.
+See [JOURNEY.md](./JOURNEY.md) for the full development story.
