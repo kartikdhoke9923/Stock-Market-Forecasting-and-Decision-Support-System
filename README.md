@@ -136,4 +136,4 @@ stock-analyzer/
 ## Disclaimer
 
 This tool is for **educational and research purposes only** — not financial advice.
-See [JOURNEY.md](./JOURNEY.md) for the full development story.
+See [journey.md](./journey.md) for the full development story.

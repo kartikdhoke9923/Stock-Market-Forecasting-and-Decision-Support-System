@@ -170,11 +170,11 @@ Local development
   ↓
 Render (original LSTM project) — crashed, unreliable
   ↓  
-Railway free tier — 500 hour/month limit, not suitable for public use
+Railway free tier — 500 hour/month limit and was not suitable for public use so skipped this also
   ↓
 AWS EC2 t3.micro (free tier, 12 months)
   + Streamlit Community Cloud (free forever)
-  = Always-on, production-grade, $0/month
+  = Always-on, production-grade, good to go
 ```
 
 ---
