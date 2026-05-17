@@ -295,3 +295,60 @@ def get_info_v8(symbol: str) -> dict:
         pass
 
     return info
+
+
+def get_key_stats(symbol: str) -> dict:
+    """
+    Fetch market cap, P/E, beta, dividend yield via quoteSummary using our cookie session.
+    Falls back to empty dict silently — never crashes the caller.
+    """
+    try:
+        crumb   = _get_crumb()
+        modules = "summaryDetail,defaultKeyStatistics,financialData"
+        url     = (
+            f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
+            f"?modules={modules}&crumb={crumb}&formatted=false"
+        )
+        r = _session.get(url, timeout=12)
+        if not r.ok:
+            return {}
+
+        result = r.json().get("quoteSummary", {}).get("result", [{}])
+        data   = result[0] if result else {}
+
+        def _r(section, key, dec=2):
+            val = data.get(section, {}).get(key)
+            if isinstance(val, dict):
+                val = val.get("raw")
+            if val is None:
+                return None
+            try:
+                import math
+                f = float(val)
+                return None if (math.isnan(f) or math.isinf(f)) else round(f, dec)
+            except Exception:
+                return None
+
+        sd = data.get("summaryDetail", {})
+        ks = data.get("defaultKeyStatistics", {})
+        fd = data.get("financialData", {})
+
+        mcap = _r("summaryDetail", "marketCap", 0)
+        return {
+            "market_cap":      mcap,
+            "market_cap_fmt":  (f"${mcap/1e12:.2f}T" if mcap and mcap>=1e12 else
+                                f"${mcap/1e9:.1f}B"   if mcap and mcap>=1e9  else
+                                f"${mcap/1e6:.0f}M"   if mcap else "N/A"),
+            "pe_ratio":        _r("summaryDetail", "trailingPE"),
+            "forward_pe":      _r("summaryDetail", "forwardPE"),
+            "beta":            _r("summaryDetail", "beta"),
+            "dividend_yield":  _r("summaryDetail", "dividendYield", 4),
+            "avg_volume":      _r("summaryDetail", "averageVolume", 0),
+            "eps_ttm":         _r("defaultKeyStatistics", "trailingEps"),
+            "52w_high":        _r("summaryDetail", "fiftyTwoWeekHigh"),
+            "52w_low":         _r("summaryDetail", "fiftyTwoWeekLow"),
+            "profit_margin":   _r("financialData", "profitMargins", 4),
+        }
+    except Exception as e:
+        print(f"[key_stats] Failed for {symbol}: {e}")
+        return {}

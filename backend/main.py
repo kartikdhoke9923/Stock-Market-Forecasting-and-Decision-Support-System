@@ -9,7 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
-from utils       import fetch_history, get_info_v8
+from utils        import fetch_history, get_info_v8, get_key_stats
+from logger_config import log
+import time as _time
 from indicators  import compute_all_indicators
 from sentiment   import analyze_news_sentiment
 from earnings    import get_earnings_data
@@ -19,15 +21,36 @@ from backtester  import run_backtest, walk_forward
 from portfolio   import optimize_portfolio
 
 app = FastAPI(title="Stock Analyzer API", version="3.0.0",
-              description="Phase 1 + 2 — Indicators · Sentiment · Backtesting · Portfolio")
+              description="Phase 1 + 2 + 3 — Indicators · Sentiment · Backtesting · Portfolio · AI")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+from fastapi import Request
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start   = _time.time()
+    try:
+        response = await call_next(request)
+        duration = _time.time() - start
+        log.info(f"{request.method} {request.url.path} → {response.status_code} ({duration:.2f}s)")
+        return response
+    except Exception as e:
+        log.error(f"{request.method} {request.url.path} → ERROR: {e}")
+        raise
+
 
 # ── Health ────────────────────────────────────────────────────
+@app.on_event("startup")
+async def startup_event():
+    log.info("="*50)
+    log.info("Stock Analyzer API starting up...")
+    log.info("Phase 1 + 2 + 3 loaded")
+    log.info("="*50)
+
 @app.get("/")
 def root():
-    return {"service": "Stock Analyzer API", "version": "3.0", "phase": "1+2"}
+    return {"service": "Stock Analyzer API", "version": "3.0", "phase": "1+2+3"}
 
 @app.get("/health")
 def health():
@@ -44,20 +67,33 @@ def get_info(ticker_sym: str):
         if not price:
             raise HTTPException(status_code=404,
                 detail=f"No data for '{sym}'. Check format: AAPL, RELIANCE.NS, BTC-USD")
-        mcap = info.get("market_cap")
+
+        # Fetch key stats (market cap, P/E, beta) via quoteSummary with our session
+        stats = get_key_stats(sym)
+
+        mcap     = stats.get("market_cap") or info.get("market_cap")
+        mcap_fmt = stats.get("market_cap_fmt") or (
+            f"${mcap/1e12:.2f}T" if mcap and mcap>=1e12 else
+            f"${mcap/1e9:.1f}B"  if mcap and mcap>=1e9  else
+            f"${mcap/1e6:.0f}M"  if mcap else "N/A")
+
         return {
             "ticker": sym, "name": info.get("name", sym),
             "sector": info.get("sector","N/A"), "industry": info.get("industry","N/A"),
             "exchange": info.get("exchange","N/A"), "currency": info.get("currency","USD"),
-            "market_cap": mcap,
-            "market_cap_fmt": (f"${mcap/1e12:.2f}T" if mcap and mcap>=1e12 else
-                               f"${mcap/1e9:.1f}B"   if mcap and mcap>=1e9  else
-                               f"${mcap/1e6:.0f}M"   if mcap else "N/A"),
+            "market_cap":     mcap,
+            "market_cap_fmt": mcap_fmt,
             "current_price":  round(float(price), 4),
             "previous_close": info.get("previous_close"),
-            "52w_high": info.get("52w_high"), "52w_low": info.get("52w_low"),
-            "pe_ratio": None, "forward_pe": None, "dividend_yield": None,
-            "beta": None, "avg_volume": None, "description": info.get("description",""),
+            "52w_high":       stats.get("52w_high")       or info.get("52w_high"),
+            "52w_low":        stats.get("52w_low")        or info.get("52w_low"),
+            "pe_ratio":       stats.get("pe_ratio"),
+            "forward_pe":     stats.get("forward_pe"),
+            "dividend_yield": stats.get("dividend_yield"),
+            "beta":           stats.get("beta"),
+            "avg_volume":     stats.get("avg_volume"),
+            "eps_ttm":        stats.get("eps_ttm"),
+            "description":    info.get("description",""),
         }
     except HTTPException:
         raise

@@ -397,13 +397,24 @@ with tab_ov:
     st.divider()
 
     # ── Key stats row ─────────────────────────────────────────
-    c1, c2, c3, c4, c5 = st.columns(5)
-    mc  = info.get("market_cap")
-    c1.metric("Market Cap",   info.get("market_cap_fmt", "N/A"))
-    c2.metric("P/E (TTM)",    f"{info.get('pe_ratio'):.1f}"  if info.get("pe_ratio") else "N/A")
-    c3.metric("52W High",     f"${info.get('52w_high'):,.2f}" if info.get("52w_high") else "N/A")
-    c4.metric("52W Low",      f"${info.get('52w_low'):,.2f}"  if info.get("52w_low")  else "N/A")
-    c5.metric("Beta",         f"{info.get('beta'):.2f}"       if info.get("beta")     else "N/A")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("Market Cap",    info.get("market_cap_fmt","N/A"))
+    c2.metric("P/E (TTM)",     f"{info.get('pe_ratio'):.1f}"     if info.get("pe_ratio")     else "N/A")
+    c3.metric("Fwd P/E",       f"{info.get('forward_pe'):.1f}"   if info.get("forward_pe")   else "N/A")
+    c4.metric("Beta",          f"{info.get('beta'):.2f}"         if info.get("beta")         else "N/A")
+    c5.metric("52W High",      f"${info.get('52w_high'):,.2f}"   if info.get("52w_high")     else "N/A")
+    c6.metric("52W Low",       f"${info.get('52w_low'):,.2f}"    if info.get("52w_low")      else "N/A")
+
+    # Second row — earnings + dividend
+    d1, d2, d3, d4 = st.columns(4)
+    div = info.get("dividend_yield")
+    eps = info.get("eps_ttm")
+    avg_vol = info.get("avg_volume")
+    d1.metric("EPS (TTM)",     f"${eps:.2f}"                     if eps                      else "N/A")
+    d2.metric("Dividend Yield",f"{div*100:.2f}%"                 if div                      else "N/A")
+    d3.metric("Avg Volume",    f"{avg_vol/1e6:.1f}M"             if avg_vol and avg_vol>1e6  else
+                               f"{avg_vol/1e3:.0f}K"             if avg_vol                  else "N/A")
+    d4.metric("Sector",        info.get("sector","N/A"))
 
     # ── Indicator snapshot ────────────────────────────────────
     if ind:
