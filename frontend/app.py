@@ -464,7 +464,7 @@ with tab_ta:
         st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
         st.subheader("Price Chart — 90 Days")
-        st.plotly_chart(chart_price(ind["history"], active), width='stretch', key="ta_price")
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
         col1, col2 = st.columns(2)
         with col1:
