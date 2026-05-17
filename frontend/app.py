@@ -317,7 +317,7 @@ with st.sidebar:
     if resolved_from and resolved_from.lower() != st.session_state["ticker"].lower():
         st.caption(f"✓ Showing: **{st.session_state['ticker']}** ({TICKER_NAMES.get(st.session_state['ticker'], '')})")
 
-    analyze = st.button("🔍 Analyze", type="primary", width='stretch')
+    analyze = st.button("🔍 Analyze", type="primary", use_container_width=True)
 
     st.divider()
     st.markdown("**Quick Tickers**")
@@ -325,7 +325,7 @@ with st.sidebar:
     cols = st.columns(2)
     for i, t in enumerate(quick):
         name = TICKER_NAMES.get(t, t)
-        if cols[i % 2].button(name, key=f"q_{t}", width='stretch', help=f"Ticker: {t}"):
+        if cols[i % 2].button(name, key=f"q_{t}", use_container_width=True, help=f"Ticker: {t}"):
             st.session_state["ticker"] = t
             st.rerun()
 
