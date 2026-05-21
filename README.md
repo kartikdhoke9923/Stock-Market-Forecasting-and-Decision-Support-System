@@ -8,6 +8,8 @@ Stock market prediction is not an easy task it requires a lot of metrics, news c
 
 ---
 
+![demo](stock_gif.gif)
+
 ## Architecture
 
 ```
